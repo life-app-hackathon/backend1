@@ -32,54 +32,105 @@ type UserClerk struct {
 	EventAttributes EventAttributes `json:"event_attributes"`
 	InstanceID      string          `json:"instance_id"`
 	Object          string          `json:"object"`
-	Timestamp       int             `json:"timestamp"`
+	Timestamp       int64           `json:"timestamp"`
 	Type            string          `json:"type"`
 }
+type LinkedTo struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+type Verification struct {
+	Attempts any    `json:"attempts"`
+	ExpireAt any    `json:"expire_at"`
+	Object   string `json:"object"`
+	Status   string `json:"status"`
+	Strategy string `json:"strategy"`
+}
+type EmailAddresses struct {
+	CreatedAt            int64        `json:"created_at"`
+	EmailAddress         string       `json:"email_address"`
+	ID                   string       `json:"id"`
+	LinkedTo             []LinkedTo   `json:"linked_to"`
+	MatchesSsoConnection bool         `json:"matches_sso_connection"`
+	Object               string       `json:"object"`
+	Reserved             bool         `json:"reserved"`
+	UpdatedAt            int64        `json:"updated_at"`
+	Verification         Verification `json:"verification"`
+}
 type PublicMetadata struct {
+}
+type ExternalAccounts struct {
+	ApprovedScopes       string         `json:"approved_scopes"`
+	AvatarURL            string         `json:"avatar_url"`
+	CreatedAt            int64          `json:"created_at"`
+	EmailAddress         string         `json:"email_address"`
+	EmailAddressVerified bool           `json:"email_address_verified"`
+	ExternalAccountID    string         `json:"external_account_id"`
+	FamilyName           string         `json:"family_name"`
+	FirstName            string         `json:"first_name"`
+	GivenName            string         `json:"given_name"`
+	GoogleID             string         `json:"google_id"`
+	ID                   string         `json:"id"`
+	IdentificationID     string         `json:"identification_id"`
+	Label                any            `json:"label"`
+	LastName             string         `json:"last_name"`
+	Object               string         `json:"object"`
+	Picture              string         `json:"picture"`
+	Provider             string         `json:"provider"`
+	ProviderUserID       string         `json:"provider_user_id"`
+	PublicMetadata       PublicMetadata `json:"public_metadata"`
+	UpdatedAt            int64          `json:"updated_at"`
+	Username             any            `json:"username"`
+	Verification         Verification   `json:"verification"`
+}
+type PrivateMetadata struct {
 }
 type UnsafeMetadata struct {
 }
 type Data struct {
-	BackupCodeEnabled             bool           `json:"backup_code_enabled"`
-	Banned                        bool           `json:"banned"`
-	CreateOrganizationEnabled     bool           `json:"create_organization_enabled"`
-	CreateOrganizationsLimit      any            `json:"create_organizations_limit"`
-	CreatedAt                     int64          `json:"created_at"`
-	DeleteSelfEnabled             bool           `json:"delete_self_enabled"`
-	EmailAddresses                []any          `json:"email_addresses"`
-	EnterpriseAccounts            []any          `json:"enterprise_accounts"`
-	ExternalAccounts              []any          `json:"external_accounts"`
-	ExternalID                    any            `json:"external_id"`
-	FirstName                     string         `json:"first_name"`
-	HasImage                      bool           `json:"has_image"`
-	ID                            string         `json:"id"`
-	ImageURL                      string         `json:"image_url"`
-	LastActiveAt                  int64          `json:"last_active_at"`
-	LastName                      string         `json:"last_name"`
-	LastSignInAt                  int64          `json:"last_sign_in_at"`
-	LegalAcceptedAt               int64          `json:"legal_accepted_at"`
-	Locked                        bool           `json:"locked"`
-	LockoutExpiresInSeconds       any            `json:"lockout_expires_in_seconds"`
-	MfaDisabledAt                 any            `json:"mfa_disabled_at"`
-	MfaEnabledAt                  any            `json:"mfa_enabled_at"`
-	Object                        string         `json:"object"`
-	Passkeys                      []any          `json:"passkeys"`
-	PasswordEnabled               bool           `json:"password_enabled"`
-	PhoneNumbers                  []any          `json:"phone_numbers"`
-	PrimaryEmailAddressID         string         `json:"primary_email_address_id"`
-	PrimaryPhoneNumberID          any            `json:"primary_phone_number_id"`
-	PrimaryWeb3WalletID           any            `json:"primary_web3_wallet_id"`
-	PrivateMetadata               any            `json:"private_metadata"`
-	ProfileImageURL               string         `json:"profile_image_url"`
-	PublicMetadata                PublicMetadata `json:"public_metadata"`
-	SamlAccounts                  []any          `json:"saml_accounts"`
-	TotpEnabled                   bool           `json:"totp_enabled"`
-	TwoFactorEnabled              bool           `json:"two_factor_enabled"`
-	UnsafeMetadata                UnsafeMetadata `json:"unsafe_metadata"`
-	UpdatedAt                     int64          `json:"updated_at"`
-	Username                      any            `json:"username"`
-	VerificationAttemptsRemaining any            `json:"verification_attempts_remaining"`
-	Web3Wallets                   []any          `json:"web3_wallets"`
+	BackupCodeEnabled             bool               `json:"backup_code_enabled"`
+	Banned                        bool               `json:"banned"`
+	BypassClientTrust             bool               `json:"bypass_client_trust"`
+	CreateOrganizationEnabled     bool               `json:"create_organization_enabled"`
+	CreatedAt                     int64              `json:"created_at"`
+	DeleteSelfEnabled             bool               `json:"delete_self_enabled"`
+	EmailAddresses                []EmailAddresses   `json:"email_addresses"`
+	EnterpriseAccounts            []any              `json:"enterprise_accounts"`
+	ExternalAccounts              []ExternalAccounts `json:"external_accounts"`
+	ExternalID                    any                `json:"external_id"`
+	FirstName                     string             `json:"first_name"`
+	HasImage                      bool               `json:"has_image"`
+	ID                            string             `json:"id"`
+	ImageURL                      string             `json:"image_url"`
+	LastActiveAt                  int64              `json:"last_active_at"`
+	LastName                      string             `json:"last_name"`
+	LastSignInAt                  any                `json:"last_sign_in_at"`
+	LegalAcceptedAt               any                `json:"legal_accepted_at"`
+	Locale                        any                `json:"locale"`
+	Locked                        bool               `json:"locked"`
+	LockoutExpiresInSeconds       any                `json:"lockout_expires_in_seconds"`
+	MfaDisabledAt                 any                `json:"mfa_disabled_at"`
+	MfaEnabledAt                  any                `json:"mfa_enabled_at"`
+	Object                        string             `json:"object"`
+	Passkeys                      []any              `json:"passkeys"`
+	PasswordEnabled               bool               `json:"password_enabled"`
+	PasswordLastUpdatedAt         any                `json:"password_last_updated_at"`
+	PhoneNumbers                  []any              `json:"phone_numbers"`
+	PrimaryEmailAddressID         string             `json:"primary_email_address_id"`
+	PrimaryPhoneNumberID          any                `json:"primary_phone_number_id"`
+	PrimaryWeb3WalletID           any                `json:"primary_web3_wallet_id"`
+	PrivateMetadata               PrivateMetadata    `json:"private_metadata"`
+	ProfileImageURL               string             `json:"profile_image_url"`
+	PublicMetadata                PublicMetadata     `json:"public_metadata"`
+	RequiresPasswordReset         bool               `json:"requires_password_reset"`
+	SamlAccounts                  []any              `json:"saml_accounts"`
+	TotpEnabled                   bool               `json:"totp_enabled"`
+	TwoFactorEnabled              bool               `json:"two_factor_enabled"`
+	UnsafeMetadata                UnsafeMetadata     `json:"unsafe_metadata"`
+	UpdatedAt                     int64              `json:"updated_at"`
+	Username                      any                `json:"username"`
+	VerificationAttemptsRemaining int                `json:"verification_attempts_remaining"`
+	Web3Wallets                   []any              `json:"web3_wallets"`
 }
 type HTTPRequest struct {
 	ClientIP  string `json:"client_ip"`
@@ -239,7 +290,7 @@ func main() {
 		if err != nil {
 			if err.Error() == "no rows in result set" {
 				// user doesn't exist, insert into database
-				_, err := db.Exec(c.Context(), "INSERT INTO users (id, name, email) VALUES ($1, $2, $3)", event.Data.ID, fmt.Sprintf("%s %s", event.Data.FirstName, event.Data.LastName), "")
+				_, err := db.Exec(c.Context(), "INSERT INTO users (id, name, email) VALUES ($1, $2, $3)", event.Data.ID, fmt.Sprintf("%s %s", event.Data.FirstName, event.Data.LastName), event.Data.EmailAddresses[0].EmailAddress)
 				if err != nil {
 					log.Error("Failed to insert user into database: ", err)
 					return c.Status(500).JSON(fiber.Map{"error": "Failed to save user data " + err.Error()})
