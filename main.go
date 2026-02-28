@@ -242,7 +242,7 @@ func main() {
 				_, err := db.Exec(c.Context(), "INSERT INTO users (id, name, email) VALUES ($1, $2, $3)", event.Data.ID, fmt.Sprintf("%s %s", event.Data.FirstName, event.Data.LastName), "")
 				if err != nil {
 					log.Error("Failed to insert user into database: ", err)
-					return c.Status(500).JSON(fiber.Map{"error": "Failed to save user data"})
+					return c.Status(500).JSON(fiber.Map{"error": "Failed to save user data " + err.Error()})
 				}
 				log.Infof("Inserted new user into database: %s", event.Data.ID)
 			} else {
