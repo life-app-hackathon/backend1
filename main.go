@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/log"
 	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/robfig/cron/v3"
 )
 
 type User struct {
@@ -140,12 +146,167 @@ type EventAttributes struct {
 	HTTPRequest HTTPRequest `json:"http_request"`
 }
 
+type SubItem struct {
+	Name    string  `json:"name"`
+	Price   float64 `json:"price"`
+	DueDate string  `json:"dueDate"`
+	Cycle   string  `json:"cycle"`
+}
+
+type StudyItem struct {
+	Name    string `json:"name"`
+	DueDate string `json:"dueDate"`
+}
+
+// 1. Update the parse function to respect the local timezone
+func parseDueDate(dateStr string, loc *time.Location) (time.Time, error) {
+	layout := "Jan 02, 2006"
+	return time.ParseInLocation(layout, dateStr, loc)
+}
+
+func checkAssignments(db *pgxpool.Pool) {
+	log.Info("Running assignments check...")
+	ctx := context.Background()
+
+	rows, err := db.Query(ctx, "SELECT user_id, content FROM categories WHERE name='Academics'")
+	if err != nil {
+		log.Error("Failed to query academics: ", err)
+		return
+	}
+	defer rows.Close()
+
+	now := time.Now()
+	// 2. Normalize "today" to exactly 00:00:00 (Midnight) to prevent hour-truncation bugs
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	for rows.Next() {
+		var userId string
+		var content json.RawMessage
+		if err := rows.Scan(&userId, &content); err != nil {
+			continue
+		}
+
+		var wrapper map[string][]StudyItem
+		if err := json.Unmarshal(content, &wrapper); err != nil {
+			continue
+		}
+
+		for _, task := range wrapper["items"] {
+			// 3. Pass the location so both dates are in the same timezone
+			dueDate, err := parseDueDate(task.DueDate, now.Location())
+			if err != nil {
+				continue
+			}
+
+			// 4. Calculate calendar days remaining using our normalized 'today'
+			daysUntilDue := int(dueDate.Sub(today).Hours() / 24)
+
+			// Alert if due in 2 days, 1 day, or TODAY
+			if daysUntilDue >= 0 && daysUntilDue <= 2 {
+				urgency := "URGENT"
+				if daysUntilDue == 0 {
+					urgency = "DUE TODAY"
+				}
+
+				cleanName := strings.ReplaceAll(task.Name, "🔴 ", "")
+				cleanName = strings.ReplaceAll(cleanName, "🟡 ", "")
+				cleanName = strings.ReplaceAll(cleanName, "🟢 ", "")
+
+				alertMsg := fmt.Sprintf("📚 %s: %s is due in %d days!", urgency, cleanName, daysUntilDue)
+				if daysUntilDue == 0 {
+					alertMsg = fmt.Sprintf("📚 %s: %s!", urgency, cleanName)
+				}
+
+				log.Info("Sending study alert to user: ", userId, " -> ", alertMsg)
+
+				http.Post("https://ntfy.sh/hackaton", "text/plain", strings.NewReader(alertMsg))
+			}
+		}
+	}
+}
+
+func checkSubscriptions(db *pgxpool.Pool) {
+	log.Info("Running daily subscription check...")
+	ctx := context.Background()
+
+	// 1. Fetch all subscription categories from the database
+	rows, err := db.Query(ctx, "SELECT user_id, content FROM categories WHERE name='Subscriptions'")
+	if err != nil {
+		log.Error("Failed to query subscriptions: ", err)
+		return
+	}
+	defer rows.Close()
+
+	now := time.Now()
+
+	// 2. Iterate through every user's subscriptions
+	for rows.Next() {
+		var userId string
+		var content json.RawMessage
+
+		if err := rows.Scan(&userId, &content); err != nil {
+			continue
+		}
+
+		// Extract the items array
+		var wrapper map[string][]SubItem
+		if err := json.Unmarshal(content, &wrapper); err != nil {
+			continue
+		}
+
+		// 3. Check each subscription date
+		for _, sub := range wrapper["items"] {
+			if sub.DueDate == "TBD" {
+				continue
+			}
+
+			dueDate, err := parseDueDate(sub.DueDate, now.Location())
+			if err != nil {
+				log.Errorf("Invalid date format for %s: %s", sub.Name, sub.DueDate)
+				continue
+			}
+
+			// Calculate the difference in days
+			daysUntilDue := int(dueDate.Sub(now).Hours() / 24)
+
+			// 4. Trigger Notifications!
+			// If it's due in exactly 3 days, or if it is due TODAY (0 days)
+			if daysUntilDue == 3 || daysUntilDue == 0 {
+				alertMsg := fmt.Sprintf("Reminder: %s (%s) renews in %d days for $%.2f!", sub.Name, sub.Cycle, daysUntilDue, sub.Price)
+				if daysUntilDue == 0 {
+					alertMsg = fmt.Sprintf("ALERT: %s renews TODAY for $%.2f!", sub.Name, sub.Price)
+				}
+
+				log.Info("Sending alert to user: ", userId, " -> ", alertMsg)
+
+				http.Post("https://ntfy.sh/hackaton", "text/plain", strings.NewReader(alertMsg))
+			}
+		}
+	}
+}
+
 func main() {
 	var err error
 	db, err := connecDatabase()
 	if err != nil {
 		panic(err)
 	}
+
+	c := cron.New()
+
+	//// every 5 seconds
+	_, err = c.AddFunc("@every 5m", func() { checkSubscriptions(db) })
+	if err != nil {
+		return
+	}
+	_, err = c.AddFunc("@every 5m", func() { checkAssignments(db) })
+	if err != nil {
+		return
+	}
+
+	c.Start()
+	defer c.Stop() // Ensure cron stops gracefully when the app closes
+	log.Info("Subscription scheduler started.")
 
 	app := fiber.New()
 
@@ -154,6 +315,7 @@ func main() {
 	users := app.Group("/users")
 	categories := app.Group("/categories")
 	recipes := app.Group("/recipes")
+	scrapers := app.Group("/scrapers")
 
 	// --- USERS ENDPOINTS ---
 	users.Post("/", func(c fiber.Ctx) error {
@@ -303,6 +465,63 @@ func main() {
 		}
 
 		return c.SendStatus(200)
+	})
+
+	// --- UPDATED CANVAS SCRAPER ---
+	scrapers.Post("/canvas", func(c fiber.Ctx) error {
+		userId := c.Query("user_id")
+		if userId == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "user_id query parameter is required"})
+		}
+
+		// 1. Check if the user already has scraped data
+		var existingContent []byte
+		err := db.QueryRow(c.Context(), "SELECT content FROM categories WHERE user_id=$1 AND name='Academics'", userId).Scan(&existingContent)
+
+		if err == nil {
+			// It already exists! Just return the existing data and skip the scraping delay.
+			var wrapper map[string][]StudyItem
+			json.Unmarshal(existingContent, &wrapper)
+			return c.JSON(fiber.Map{"items": wrapper["items"]})
+		}
+
+		// 2. If it doesn't exist, simulate the scraping delay (First time only)
+		time.Sleep(2 * time.Second)
+
+		courses := []string{"MATH 201", "HIST 105", "CS 350", "PHYS 101", "ENG 202"}
+		tasks := []string{"Final Exam", "Midterm Essay", "Lab Report", "Problem Set 4", "Reading Quiz"}
+
+		numItems := rand.Intn(3) + 2
+		var results []StudyItem
+
+		for i := 0; i < numItems; i++ {
+			course := courses[rand.Intn(len(courses))]
+			task := tasks[rand.Intn(len(tasks))]
+			days := rand.Intn(14) + 1
+
+			targetDate := time.Now().AddDate(0, 0, days).Format("Jan 02, 2006")
+
+			color := "🟢"
+			if days <= 2 {
+				color = "🔴"
+			} else if days <= 5 {
+				color = "🟡"
+			}
+
+			results = append(results, StudyItem{
+				Name:    fmt.Sprintf("%s %s: %s", color, course, task),
+				DueDate: targetDate,
+			})
+		}
+
+		// 3. Save it to the database so it's only generated this first time
+		contentBytes, _ := json.Marshal(fiber.Map{"items": results})
+		_, err = db.Exec(c.Context(), "INSERT INTO categories (user_id, name, content) VALUES ($1, $2, $3)", userId, "Academics", contentBytes)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to save scraped data"})
+		}
+
+		return c.JSON(fiber.Map{"items": results})
 	})
 
 	log.Fatal(app.Listen(":8080"))
