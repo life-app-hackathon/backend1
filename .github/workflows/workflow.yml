@@ -50,7 +50,7 @@ jobs:
 
   release:
     needs: build
-    runs-on: home-server-2
+    runs-on: public-server-1
     permissions:
       contents: write
 
