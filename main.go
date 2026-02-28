@@ -26,6 +26,68 @@ type RecipeRequest struct {
 	Ingredients []string `json:"ingredients"`
 }
 
+type UserClerk struct {
+	Data            Data            `json:"data"`
+	EventAttributes EventAttributes `json:"event_attributes"`
+	InstanceID      string          `json:"instance_id"`
+	Object          string          `json:"object"`
+	Timestamp       int             `json:"timestamp"`
+	Type            string          `json:"type"`
+}
+type PublicMetadata struct {
+}
+type UnsafeMetadata struct {
+}
+type Data struct {
+	BackupCodeEnabled             bool           `json:"backup_code_enabled"`
+	Banned                        bool           `json:"banned"`
+	CreateOrganizationEnabled     bool           `json:"create_organization_enabled"`
+	CreateOrganizationsLimit      any            `json:"create_organizations_limit"`
+	CreatedAt                     int64          `json:"created_at"`
+	DeleteSelfEnabled             bool           `json:"delete_self_enabled"`
+	EmailAddresses                []any          `json:"email_addresses"`
+	EnterpriseAccounts            []any          `json:"enterprise_accounts"`
+	ExternalAccounts              []any          `json:"external_accounts"`
+	ExternalID                    any            `json:"external_id"`
+	FirstName                     string         `json:"first_name"`
+	HasImage                      bool           `json:"has_image"`
+	ID                            string         `json:"id"`
+	ImageURL                      string         `json:"image_url"`
+	LastActiveAt                  int64          `json:"last_active_at"`
+	LastName                      string         `json:"last_name"`
+	LastSignInAt                  int64          `json:"last_sign_in_at"`
+	LegalAcceptedAt               int64          `json:"legal_accepted_at"`
+	Locked                        bool           `json:"locked"`
+	LockoutExpiresInSeconds       any            `json:"lockout_expires_in_seconds"`
+	MfaDisabledAt                 any            `json:"mfa_disabled_at"`
+	MfaEnabledAt                  any            `json:"mfa_enabled_at"`
+	Object                        string         `json:"object"`
+	Passkeys                      []any          `json:"passkeys"`
+	PasswordEnabled               bool           `json:"password_enabled"`
+	PhoneNumbers                  []any          `json:"phone_numbers"`
+	PrimaryEmailAddressID         string         `json:"primary_email_address_id"`
+	PrimaryPhoneNumberID          any            `json:"primary_phone_number_id"`
+	PrimaryWeb3WalletID           any            `json:"primary_web3_wallet_id"`
+	PrivateMetadata               any            `json:"private_metadata"`
+	ProfileImageURL               string         `json:"profile_image_url"`
+	PublicMetadata                PublicMetadata `json:"public_metadata"`
+	SamlAccounts                  []any          `json:"saml_accounts"`
+	TotpEnabled                   bool           `json:"totp_enabled"`
+	TwoFactorEnabled              bool           `json:"two_factor_enabled"`
+	UnsafeMetadata                UnsafeMetadata `json:"unsafe_metadata"`
+	UpdatedAt                     int64          `json:"updated_at"`
+	Username                      any            `json:"username"`
+	VerificationAttemptsRemaining any            `json:"verification_attempts_remaining"`
+	Web3Wallets                   []any          `json:"web3_wallets"`
+}
+type HTTPRequest struct {
+	ClientIP  string `json:"client_ip"`
+	UserAgent string `json:"user_agent"`
+}
+type EventAttributes struct {
+	HTTPRequest HTTPRequest `json:"http_request"`
+}
+
 func main() {
 	var err error
 	db, err := connecDatabase()
@@ -156,6 +218,37 @@ func main() {
 				"5. Serve hot and enjoy your creation!", ings)
 
 		return c.JSON(fiber.Map{"recipe": mockRecipe})
+	})
+
+	app.Post("/clerk", func(c fiber.Ctx) error {
+
+		var event UserClerk
+		if err := c.Bind().Body(&event); err != nil {
+			log.Error("Failed to parse Clerk event: ", err)
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		}
+
+		log.Infof("Received Clerk event: %s for user %s", event.Type, event.Data.ID)
+
+		// save into users table if user doesn't exist
+		var existingUserId string
+		err := db.QueryRow(c.Context(), "SELECT id FROM users WHERE id=$1", event.Data.ID).Scan(&existingUserId)
+		if err != nil {
+			if err.Error() == "no rows in result set" {
+				// user doesn't exist, insert into database
+				_, err := db.Exec(c.Context(), "INSERT INTO users (id, name, email) VALUES ($1, $2, $3)", event.Data.ID, fmt.Sprintf("%s %s", event.Data.FirstName, event.Data.LastName), "")
+				if err != nil {
+					log.Error("Failed to insert user into database: ", err)
+					return c.Status(500).JSON(fiber.Map{"error": "Failed to save user data"})
+				}
+				log.Infof("Inserted new user into database: %s", event.Data.ID)
+			} else {
+				log.Error("Database query error: ", err)
+				return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+			}
+		}
+
+		return c.SendStatus(200)
 	})
 
 	log.Fatal(app.Listen(":8080"))
