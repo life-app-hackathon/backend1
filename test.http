@@ -1,0 +1,61 @@
+POST http://localhost:8080/users
+Content-Type: application/json
+
+{
+  "name": "sebas",
+  "email": "sebas@gmail.com"
+}
+
+
+###
+GET http://localhost:8080/categories/06b75c4a-5e1b-4026-bffb-eaa930d53de1
+
+###
+POST localhost:8080/categories
+Content-Type: application/json
+
+{
+  "name": "Food",
+  "content": {
+    "products": [
+      {
+        "name": "Onion",
+        "amount": 2,
+        "price": 0.5
+      },
+      {
+        "name": "Tomato",
+        "amount": 3,
+        "price": 0.75
+      },
+      {
+        "name": "Cucumber",
+        "amount": 1,
+        "price": 0.25
+      },
+      {
+        "name": "Meat",
+        "amount": 1,
+        "price": 5.0
+      },
+      {
+        "name": "Rice",
+        "amount": 1,
+        "price": 1.0
+      }
+    ],
+    "services": [
+      {
+        "name": "Delivery",
+        "price": 2.0
+      },
+      {
+        "name": "Pick up",
+        "price": 1.0
+      }
+    ]
+  }
+}
+
+###
+GET http://10.9.48.209:8000/users
