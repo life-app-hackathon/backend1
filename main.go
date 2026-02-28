@@ -97,8 +97,8 @@ func main() {
 	}
 
 	app := fiber.New()
-	
-	app.Use(cors.Config{AllowOrigins: []string{"*"}, AllowMethods: []string{"GET", "POST", "PUT", "DELETE"}, AllowHeaders: []string{"Origin", "Content-Type", "Accept"}})
+
+	app.Use(cors.New())
 
 	users := app.Group("/users")
 	categories := app.Group("/categories")
